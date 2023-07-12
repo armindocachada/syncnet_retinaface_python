@@ -3,7 +3,7 @@
 import sys, time, os, pdb, argparse, pickle, subprocess, glob, cv2
 import numpy as np
 from shutil import rmtree
-
+from retinaface import RetinaFace
 import scenedetect
 from scenedetect.video_manager import VideoManager
 from scenedetect.scene_manager import SceneManager
@@ -15,7 +15,7 @@ from scipy.interpolate import interp1d
 from scipy.io import wavfile
 from scipy import signal
 
-from detectors import S3FD
+# from detectors import S3FD
 
 # ========== ========== ========== ==========
 # # PARSE ARGS
@@ -27,7 +27,7 @@ parser.add_argument('--videofile',      type=str, default='',   help='Input vide
 parser.add_argument('--reference',      type=str, default='',   help='Video reference');
 parser.add_argument('--facedet_scale',  type=float, default=0.25, help='Scale factor for face detection');
 parser.add_argument('--crop_scale',     type=float, default=0.40, help='Scale bounding box');
-parser.add_argument('--min_track',      type=int, default=100,  help='Minimum facetrack duration');
+parser.add_argument('--min_track',      type=int, default=50,  help='Minimum facetrack duration');
 parser.add_argument('--frame_rate',     type=int, default=25,   help='Frame rate');
 parser.add_argument('--num_failed_det', type=int, default=25,   help='Number of missed detections allowed before tracking is stopped');
 parser.add_argument('--min_face_size',  type=int, default=100,  help='Minimum face size in pixels');
@@ -182,9 +182,8 @@ def crop_video(opt,track,cropfile):
 # # FACE DETECTION
 # ========== ========== ========== ==========
 
-def inference_video(opt):
+def inference_video_retina(opt):
 
-  DET = S3FD(device='cuda')
 
   flist = glob.glob(os.path.join(opt.frames_dir,opt.reference,'*.jpg'))
   flist.sort()
@@ -196,18 +195,23 @@ def inference_video(opt):
     start_time = time.time()
     
     image = cv2.imread(fname)
-
+    
     image_np = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    bboxes = DET.detect_faces(image_np, conf_th=0.9, scales=[opt.facedet_scale])
 
+    resp = RetinaFace.detect_faces(image)
+    # bboxes = DET.detect_faces(image_np, conf_th=0.9, scales=[opt.facedet_scale])
     dets.append([]);
-    for bbox in bboxes:
-      dets[-1].append({'frame':fidx, 'bbox':(bbox[:-1]).tolist(), 'conf':bbox[-1]})
+    for face in resp:
+      print(resp[face])
+      dets[-1].append({'frame':fidx, 'bbox':(resp[face]["facial_area"]), 'conf': resp[face]["score"]})
+    # 
+    # for bbox in bboxes:
+    #   dets[-1].append({'frame':fidx, 'bbox':(bbox[:-1]).tolist(), 'conf':bbox[-1]})
 
     elapsed_time = time.time() - start_time
 
-    print('%s-%05d; %d dets; %.2f Hz' % (os.path.join(opt.avi_dir,opt.reference,'video.avi'),fidx,len(dets[-1]),(1/elapsed_time))) 
-
+    # print('%s-%05d; %d dets; %.2f Hz' % (os.path.join(opt.avi_dir,opt.reference,'video.avi'),fidx,len(dets[-1]),(1/elapsed_time))) 
+  print(opt.work_dir)
   savepath = os.path.join(opt.work_dir,opt.reference,'faces.pckl')
 
   with open(savepath, 'wb') as fil:
@@ -291,7 +295,7 @@ output = subprocess.call(command, shell=True, stdout=None)
 
 # ========== FACE DETECTION ==========
 
-faces = inference_video(opt)
+faces = inference_video_retina(opt)
 
 # ========== SCENE DETECTION ==========
 
@@ -303,16 +307,19 @@ alltracks = []
 vidtracks = []
 
 for shot in scene:
-
+  print("For shot in scene")
+  print(f"shot[1].frame_num={shot[1].frame_num} - shot[0].frame_num={shot[0].frame_num} >= opt.min_track={opt.min_track}")
+    
   if shot[1].frame_num - shot[0].frame_num >= opt.min_track :
+    print("inside if statement")
     alltracks.extend(track_shot(opt,faces[shot[0].frame_num:shot[1].frame_num]))
 
-# ========== FACE TRACK CROP ==========
+# # ========== FACE TRACK CROP ==========
 
 for ii, track in enumerate(alltracks):
   vidtracks.append(crop_video(opt,track,os.path.join(opt.crop_dir,opt.reference,'%05d'%ii)))
 
-# ========== SAVE RESULTS ==========
+# # ========== SAVE RESULTS ==========
 
 savepath = os.path.join(opt.work_dir,opt.reference,'tracks.pckl')
 
