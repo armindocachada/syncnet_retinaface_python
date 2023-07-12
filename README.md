@@ -1,4 +1,13 @@
-# SyncNet
+# SyncNet with RetinaFace for face cropping.
+
+This repository is a fork of the [original SyncNet repository](https://github.com/joonson/syncnet_python) with the addition of Retinaface face detection, instead of S3FD. 
+Retinaface is a more accurate and robust face detection algorithm compared to the Haar cascades face detection used in the original repository. 
+
+## Changes
+
+- Added Retinaface face detection for more accurate and robust face detection
+- Added a .devcontainer.json and a Dockerfile_retinaface to pre-install all the python dependencies
+- Updated the `README.md` file to reflect the changes
 
 This repository contains the demo for the audio-to-video synchronisation network (SyncNet). This network can be used for audio-visual synchronisation tasks including: 
 1. Removing temporal lags between the audio and visual streams in a video;
