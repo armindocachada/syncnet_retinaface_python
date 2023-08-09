@@ -1,5 +1,5 @@
 #!/usr/bin/python
-
+import json
 import sys, time, os, pdb, argparse, pickle, subprocess, glob, cv2
 import numpy as np
 from shutil import rmtree
@@ -182,6 +182,39 @@ def crop_video(opt,track,cropfile):
 # # FACE DETECTION
 # ========== ========== ========== ==========
 
+def inference_video(opt):
+
+  DET = S3FD(device='cuda')
+
+  flist = glob.glob(os.path.join(opt.frames_dir,opt.reference,'*.jpg'))
+  flist.sort()
+
+  dets = []
+      
+  for fidx, fname in enumerate(flist):
+
+    start_time = time.time()
+    
+    image = cv2.imread(fname)
+
+    image_np = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    bboxes = DET.detect_faces(image_np, conf_th=0.9, scales=[opt.facedet_scale])
+
+    # dets.append([]);
+    # for bbox in bboxes:
+    #   dets[-1].append({'frame':fidx, 'bbox':(bbox[:-1]).tolist(), 'conf':bbox[-1]})
+
+    # elapsed_time = time.time() - start_time
+
+    # print('%s-%05d; %d dets; %.2f Hz' % (os.path.join(opt.avi_dir,opt.reference,'video.avi'),fidx,len(dets[-1]),(1/elapsed_time))) 
+
+  savepath = os.path.join(opt.work_dir,opt.reference,'faces.pckl')
+
+  with open(savepath, 'wb') as fil:
+    pickle.dump(dets, fil)
+
+  return dets
+
 def inference_video_retina(opt):
 
 
@@ -201,9 +234,13 @@ def inference_video_retina(opt):
     resp = RetinaFace.detect_faces(image)
     # bboxes = DET.detect_faces(image_np, conf_th=0.9, scales=[opt.facedet_scale])
     dets.append([]);
-    for face in resp:
-      print(resp[face])
-      dets[-1].append({'frame':fidx, 'bbox':(resp[face]["facial_area"]), 'conf': resp[face]["score"]})
+    print(f"response: {resp}")
+
+    if resp is not None and len(resp) > 0:
+        for face in resp:
+            # print(resp[face])
+          if len(face) > 0:
+              dets[-1].append({'frame':fidx, 'bbox':(resp[face]["facial_area"]), 'conf': resp[face]["score"]})
     # 
     # for bbox in bboxes:
     #   dets[-1].append({'frame':fidx, 'bbox':(bbox[:-1]).tolist(), 'conf':bbox[-1]})
